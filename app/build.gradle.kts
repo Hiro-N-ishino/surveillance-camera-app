@@ -4,6 +4,26 @@ plugins {
   alias(libs.plugins.kotlin.serialization)
 }
 
+import java.util.Properties
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use {
+        keystoreProperties.load(it)
+    }
+}
+
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.inputStream().use {
+        localProperties.load(it)
+    }
+}
+
 android {
     namespace = "com.example.surveillancecamera"
     compileSdk = 36
@@ -18,11 +38,33 @@ android {
             "CAMERA_API_URL",
             "\"https://surveillance-camera-api.rm-no-preserve-root-rf.workers.dev/latest\""
         )
+        buildConfigField(
+            "String",
+            "CAMERA_USERNAME",
+            "\"${localProperties.getProperty("camera.username", "")
+                ?: error("camera.username is missing from local.properties")}\""
+        )
+        buildConfigField(
+            "String",
+            "CAMERA_PASSWORD",
+            "\"${localProperties.getProperty("camera.password", "")
+                ?: error("camera.password is missing from local.properties")}\""
+        )
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
+            storePassword = keystoreProperties["storePassword"] as String
+            keyAlias = keystoreProperties["keyAlias"] as String
+            keyPassword = keystoreProperties["keyPassword"] as String
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

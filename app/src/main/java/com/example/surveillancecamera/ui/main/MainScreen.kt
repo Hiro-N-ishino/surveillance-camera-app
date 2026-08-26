@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -29,15 +30,20 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import com.example.surveillancecamera.data.CameraRepository
 import com.example.surveillancecamera.theme.SurveillanceCameraTheme
+import com.example.surveillancecamera.ImageList
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 @Composable
 fun MainScreen(
+    selectedFileName: String?,
     onItemClick: (NavKey) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: MainScreenViewModel = viewModel {
@@ -46,8 +52,38 @@ fun MainScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(Unit) {
-        viewModel.fetchLatestImage()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    var hasResumedOnce by remember { mutableStateOf(false) }
+
+    LaunchedEffect(selectedFileName) {
+        if (selectedFileName == null) {
+            viewModel.fetchLatestImage()
+        } else {
+            viewModel.showImage(selectedFileName)
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, selectedFileName) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (
+                event == Lifecycle.Event.ON_RESUME &&
+                hasResumedOnce &&
+                selectedFileName == null
+            ) {
+                viewModel.fetchLatestImage()
+            }
+
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasResumedOnce = true
+            }
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     when (val currentState = state) {
@@ -150,7 +186,7 @@ fun MainScreen(
                         .align(Alignment.CenterHorizontally)
                         .padding(top = 8.dp)
                 ) {
-                    Text("更新")
+                    Text("更新(最新画像)")
                 }
 
                 // 前へ / 次へ
@@ -182,6 +218,17 @@ fun MainScreen(
                     ) {
                         Text("次へ")
                     }
+                }
+
+                Button(
+                    onClick = {
+                        onItemClick(ImageList)
+                    },
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(bottom = 16.dp)
+                ) {
+                    Text("画像一覧")
                 }
             }
         }

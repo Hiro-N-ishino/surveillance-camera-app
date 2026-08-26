@@ -75,6 +75,27 @@ class MainScreenViewModel(
         }
     }
 
+    fun showImage(fileName: String) {
+        viewModelScope.launch {
+            try {
+                if (imageFileNames.isEmpty()) {
+                    imageFileNames = cameraRepository.fetchImageList()
+                }
+
+                val index = imageFileNames.indexOf(fileName)
+
+                if (index == -1) {
+                    throw RuntimeException("画像が見つかりません: $fileName")
+                }
+
+                currentIndex = index
+                fetchCurrentImage()
+            } catch (e: Exception) {
+                _uiState.value = MainScreenUiState.Error(e)
+            }
+        }
+    }
+
     private suspend fun fetchCurrentImage() {
         val fileName = imageFileNames[currentIndex]
 
